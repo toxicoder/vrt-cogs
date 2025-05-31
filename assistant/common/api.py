@@ -404,14 +404,16 @@ class API(MixinMeta):
                 "Content-Type": "application/json; charset=utf-8",
             }
 
-        timeout = aiohttp.ClientTimeout(total=120)
-        async with self.bot.session.post(predict_endpoint, json=payload, headers=headers, timeout=timeout) as resp:
-            if resp.status != 200:
-                err_text = await resp.text()
-                log.error(f"Gemini Embedding API Error ({resp.status}) hitting {predict_endpoint}: {err_text}")
-                raise commands.UserFeedbackCheckFailure(
-                    _("Gemini Embedding API request failed with status {status}: {error}").format(status=resp.status, error=err_text)
-                )
+        timeout_obj = aiohttp.ClientTimeout(total=120)
+        async with aiohttp.ClientSession(timeout=timeout_obj) as session:
+            async with session.post(predict_endpoint, json=payload, headers=headers) as resp:
+                async with self.bot.session.post(predict_endpoint, json=payload, headers=headers, timeout=timeout) as resp:
+                    if resp.status != 200:
+                        err_text = await resp.text()
+                        log.error(f"Gemini Embedding API Error ({resp.status}) hitting {predict_endpoint}: {err_text}")
+                        raise commands.UserFeedbackCheckFailure(
+                            _("Gemini Embedding API request failed with status {status}: {error}").format(status=resp.status, error=err_text)
+                        )
 
             response_json = await resp.json()
 
