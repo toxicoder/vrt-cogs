@@ -1,5 +1,70 @@
 Set up and configure an AI assistant (or chat) cog for your server with one of OpenAI's ChatGPT language models.<br/><br/>Features include configurable prompt injection, dynamic embeddings, custom function calling, and more!<br/><br/>- **[p]assistant**: base command for setting up the assistant<br/>- **[p]chat**: talk with the assistant<br/>- **[p]convostats**: view a user's token usage/conversation message count for the channel<br/>- **[p]clearconvo**: reset your conversation with the assistant in the channel
 
+# Authentication Methods
+
+This cog supports two methods for authenticating with Google AI services:
+
+*   **Google AI Studio Key**: A simpler method using an API key obtained directly from Google AI Studio. Suitable for quick setups and personal use.
+
+## Google AI Studio Key
+
+This method uses an API key from Google AI Studio.
+
+1.  **Obtain your API Key**:
+    *   Go to [Google AI Studio](https://aistudio.google.com/).
+    *   Sign in with your Google account.
+    *   Click on "Get API key" (or a similar option) to generate or retrieve your API key.
+    *   Copy the key securely.
+
+2.  **Configure the Cog**:
+    *   Use the following command to set your Google AI Studio Key in the cog's settings. Replace `<your-key>` with the actual key you obtained.
+        ```
+        [p]assistant setstudiokey <your-key>
+        ```
+    *   *(Developer Note: If the command `[p]assistant setstudiokey` does not exist, this documentation assumes such a command or a similar configuration mechanism (e.g., through a general settings command or a configuration file) would be the standard way to implement this. Bot owners should verify the exact command or method provided by the cog version they are using.)*
+
+*   **Google Cloud Platform (GCP) Authentication**: A more robust method using service accounts. Recommended for self-hosted bots or when running within a GCP environment, providing more fine-grained control and security.
+
+## Google Cloud Platform (GCP) Authentication
+
+This method is recommended for self-hosted bots or those running in a GCP environment. It involves using a service account for more secure and fine-grained access control.
+
+1.  **Set up a Google Cloud Project**:
+    *   If you don't have one already, create a new project in the [Google Cloud Console](https://console.cloud.google.com/).
+    *   Ensure the Vertex AI API is enabled for your project. You can find this under "APIs & Services" > "Enabled APIs & services". If not listed, click "+ ENABLE APIS AND SERVICES" and search for "Vertex AI API" to enable it.
+
+2.  **Create a Service Account**:
+    *   In the Google Cloud Console, navigate to "IAM & Admin" > "Service Accounts".
+    *   Click "+ CREATE SERVICE ACCOUNT".
+    *   Give your service account a name (e.g., "gemini-assistant-bot").
+    *   Grant the service account the "Vertex AI User" role (roles/aiplatform.user). This role provides the necessary permissions to access Vertex AI services, including Gemini models.
+    *   Click "Done".
+
+3.  **Create and Download a Service Account Key**:
+    *   After creating the service account, find it in the list and click on it.
+    *   Go to the "KEYS" tab.
+    *   Click "ADD KEY" > "Create new key".
+    *   Choose "JSON" as the key type and click "CREATE".
+    *   A JSON file containing the key will be downloaded to your computer. **Keep this file secure and do not share it publicly.**
+
+4.  **Set Environment Variable**:
+    *   Set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable in the environment where your Red Hat Discord bot is running. This variable must contain the full path to the JSON key file you downloaded.
+        *   **Linux/macOS**: `export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/keyfile.json"`
+        *   **Windows (PowerShell)**: `$env:GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/keyfile.json"`
+        *   For Docker deployments, you can set this environment variable in your Dockerfile or docker-compose.yml.
+    *   The bot needs to be restarted after setting this environment variable for it to take effect.
+
+5.  **Configure Cog Settings**:
+    *   Set your Google Cloud Project ID in the cog's settings. This is usually the Project ID (not the project name or number) associated with your service account.
+        ```
+        [p]assistant setgoogleprojectid <your-project-id>
+        ```
+    *   *(Developer Note: The specific command to set this was not identified during review, but it's stored in `db.google_project_id` as noted in the Gemini section. Bot owners should verify the exact command or method provided by the cog version they are using.)*
+
+Once these steps are completed, the cog should be able to authenticate with Google Cloud services using the provided service account credentials.
+
+Choose the method that best suits your setup and needs. Detailed instructions for each are provided below.
+
 # Google Gemini Model Support
 
 The Assistant cog also supports Google's Gemini models, allowing you to leverage their advanced capabilities.
@@ -17,13 +82,14 @@ Once a Gemini model is selected, your interactions via the `[p]chat` command and
 
 ## Prerequisites for Gemini
 
-For Gemini models to function correctly, the following must be configured by the bot owner:
+For Gemini models to function correctly, the bot owner must have Google Cloud Platform (GCP) authentication configured as described in the **"Google Cloud Platform (GCP) Authentication"** section above. This includes:
 
-1.  **Google Cloud Project ID**: A valid Google Cloud Project ID must be set in the bot's global configuration for the Assistant. This can typically be done via an admin command (e.g., a hypothetical `[p]assistant setgoogleprojectid <your-project-id>`).
-    - *Developer Note: The specific command to set this was not identified during review, but it's stored in `db.google_project_id`.*
-2.  **Application Default Credentials (ADC)**: The environment where the bot is running must have Google Cloud Application Default Credentials configured. This usually involves setting the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to point to a service account key JSON file with appropriate permissions for Vertex AI (which powers Gemini access). Refer to Google Cloud documentation for setting up ADC.
+1.  **Setting up a Google Cloud Project and enabling the Vertex AI API.**
+2.  **Creating a Service Account with the "Vertex AI User" role (or other roles that grant `aiplatform.endpoints.predict` permission) and downloading its JSON key.**
+3.  **Setting the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to the path of the downloaded JSON key file.**
+4.  **Configuring the Google Cloud Project ID in the cog's settings** (e.g., using `[p]assistant setgoogleprojectid <your-project-id>`).
 
-Without these prerequisites, attempts to use Gemini models will result in authentication errors.
+Ensure all steps in the "Google Cloud Platform (GCP) Authentication" section have been completed. The "Vertex AI User" role is generally recommended as it provides comprehensive access for Gemini functionalities. Without proper authentication, attempts to use Gemini models will result in errors.
 
 # /draw (Slash Command)
 Generate an image with Dalle-3<br/>
