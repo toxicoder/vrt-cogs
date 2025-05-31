@@ -69,12 +69,18 @@ class API(MixinMeta):
         using_aistudio_key = False
 
         if is_gemini:
-            if self.db.gemini_api_key:
+            if self.db.google_ai_studio_api_key:
+                api_key_to_use = self.db.google_ai_studio_api_key
+                base_url_to_use = "https://generativelanguage.googleapis.com/v1beta"
+                project_id_to_use = None # Not used for AI Studio keys
+                using_aistudio_key = True
+                log.debug("Using Google AI Studio API Key for chat")
+            elif self.db.gemini_api_key: # Keep this for backwards compatibility or separate studio key
                 api_key_to_use = self.db.gemini_api_key
                 base_url_to_use = "https://generativelanguage.googleapis.com/v1beta"
                 project_id_to_use = None # Not used for AI Studio keys
                 using_aistudio_key = True
-                log.debug("Using Gemini AI Studio API Key for chat")
+                log.debug("Using Gemini (Older Style) AI Studio API Key for chat")
             else:
                 using_aistudio_key = False
                 try:
@@ -264,12 +270,18 @@ class API(MixinMeta):
         using_aistudio_key = False
 
         if is_gemini_provider:
-            if self.db.gemini_api_key:
+            if self.db.google_ai_studio_api_key:
+                api_key_to_use = self.db.google_ai_studio_api_key
+                base_url_to_use = "https://generativelanguage.googleapis.com/v1beta"
+                project_id_to_use = None # Not used for AI Studio keys
+                using_aistudio_key = True
+                log.debug("Using Google AI Studio API Key for embeddings")
+            elif self.db.gemini_api_key: # Keep this for backwards compatibility
                 api_key_to_use = self.db.gemini_api_key
                 base_url_to_use = "https://generativelanguage.googleapis.com/v1beta"
                 project_id_to_use = None # Not used for AI Studio keys
                 using_aistudio_key = True
-                log.debug("Using Gemini AI Studio API Key for embeddings")
+                log.debug("Using Gemini (Older Style) AI Studio API Key for embeddings")
             else:
                 using_aistudio_key = False
                 try:
@@ -766,29 +778,52 @@ class API(MixinMeta):
         is_gemini = model_name.startswith("gemini-")
 
         if is_gemini:
-            # If gemini_api_key is set, we can call the LLM.
+            # Priority 1: Google AI Studio API Key (new)
+            if self.db.google_ai_studio_api_key:
+                return True
+            # Priority 2: Older Gemini API Key (for AI Studio, backward compatibility)
             if self.db.gemini_api_key:
                 return True
 
-            # If no AI Studio key, check ADC for Vertex AI, which requires a project ID.
+            # Priority 3: Google Cloud ADC (Vertex AI)
+            # Check if a project ID is configured, as it's needed for Vertex AI calls via ADC
             if not self.db.google_project_id:
                 if ctx:
-                    await ctx.send(_("Google Cloud Project ID is not set and no Gemini API Key is available. This is required for Gemini models. Please use the admin command to set one of these."))
+                    await ctx.send(
+                        _(
+                            "For Gemini models, you need to set either a Google AI Studio API key, "
+                            "a Gemini API Key (older style for AI Studio), or a Google Cloud Project ID "
+                            "for use with Application Default Credentials (ADC).\n"
+                            "- Set Google AI Studio Key: `{prefix}assistant setgaistudiokey <key>`\n"
+                            "- Set Google Cloud Project ID: `{prefix}assistant gauth <project_id>`"
+                        ).format(prefix=ctx.clean_prefix)
+                    )
                 return False
             try:
-                # Try to get credentials to check if ADC is set up
-                credentials, _ = await asyncio.to_thread(google.auth.default)
+                # Try to get credentials to check if ADC is set up for Vertex AI
+                credentials, _ = await asyncio.to_thread(google.auth.default, scopes=["https://www.googleapis.com/auth/cloud-platform"])
                 if not credentials:
                     if ctx:
-                        await ctx.send(_("Google Cloud credentials not found (and no AI Studio key set). Ensure Application Default Credentials (ADC) are configured in the bot's environment."))
+                        await ctx.send(
+                            _(
+                                "Google Cloud credentials not found for Vertex AI, and no direct AI Studio key is set. "
+                                "Ensure Application Default Credentials (ADC) are configured in the bot's environment, "
+                                "or set a Google AI Studio API key."
+                            )
+                        )
                     return False
             except Exception as e:
                 if ctx:
-                    await ctx.send(_("Failed to acquire Google Cloud credentials (and no AI Studio key set): {}. Ensure ADC is configured.").format(e))
+                    await ctx.send(
+                        _(
+                            "Failed to acquire Google Cloud credentials for Vertex AI (and no AI Studio key is set): {error}. "
+                            "Ensure ADC is configured or set an AI Studio API key."
+                        ).format(error=e)
+                    )
                 log.error("ADC check failed for Gemini (no AI Studio key set)", exc_info=e)
                 return False
-            return True
-        else: # OpenAI or other non-Gemini
+            return True # ADC seems configured and project ID is present
+        else:  # OpenAI or other non-Gemini
             if not conf.api_key and not self.db.endpoint_override:
                 if ctx:
                     txt = _("There are no API keys set for LLM interaction!\n")

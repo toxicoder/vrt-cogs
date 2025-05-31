@@ -8,22 +8,33 @@ This cog supports two methods for authenticating with Google AI services:
 
 ## Google AI Studio Key
 
-This method uses an API key from Google AI Studio.
+This key is used for authenticating with Google's Gemini models via Google AI Studio. You can set this key in two ways:
 
-1.  **Obtain your API Key**:
-    *   Go to [Google AI Studio](https://aistudio.google.com/).
-    *   Sign in with your Google account.
-    *   Click on "Get API key" (or a similar option) to generate or retrieve your API key.
-    *   Copy the key securely.
-
-2.  **Configure the Cog**:
-    *   Use the following command to set your Google AI Studio Key in the cog's settings. Replace `<your-key>` with the actual key you obtained.
+1.  **Using the Admin Command (Recommended for most users)**:
+    *   The bot owner or an administrator can set the API key globally using the following command:
+        ```bash
+        [p]assistant setgaistudiokey <your_api_key>
         ```
-        [p]assistant setstudiokey <your-key>
+        Replace `<your_api_key>` with the actual key obtained from [Google AI Studio](https://aistudio.google.com/).
+    *   To clear a previously set key using this command, use:
+        ```bash
+        [p]assistant setgaistudiokey clear
         ```
-    *   *(Developer Note: If the command `[p]assistant setstudiokey` does not exist, this documentation assumes such a command or a similar configuration mechanism (e.g., through a general settings command or a configuration file) would be the standard way to implement this. Bot owners should verify the exact command or method provided by the cog version they are using.)*
 
-*   **Google Cloud Platform (GCP) Authentication**: A more robust method using service accounts. Recommended for self-hosted bots or when running within a GCP environment, providing more fine-grained control and security.
+2.  **Setting an Environment Variable (Advanced)**:
+    *   You can set the `GOOGLE_AI_STUDIO_API_KEY` environment variable in the environment where your Red Discord Bot is running.
+        ```bash
+        export GOOGLE_AI_STUDIO_API_KEY="your_actual_api_key"
+        ```
+    *   The bot will automatically detect and use this key upon startup.
+    *   This method is often preferred for deployments using Docker or other containerization systems, as it keeps sensitive keys out of bot commands or configuration files that might be version-controlled.
+
+**Important Notes**:
+*   **Precedence**: If the `GOOGLE_AI_STUDIO_API_KEY` environment variable is set, it will **always take precedence** over any key set using the `setgaistudiokey` command.
+*   **Security**: Treat your API key like a password. Do not share it publicly or commit it to version control.
+*   **Usage**: This API key is specifically for accessing Gemini models through the Google AI Studio endpoint. For Vertex AI access (another way to use Gemini), you'll need to configure GCP Authentication.
+
+*   **Google Cloud Platform (GCP) Authentication**: A more robust method using service accounts for accessing Google Cloud services, including Vertex AI which can also run Gemini models. Recommended for self-hosted bots or when running within a GCP environment, providing more fine-grained control and security.
 
 ## Google Cloud Platform (GCP) Authentication
 
