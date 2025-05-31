@@ -405,9 +405,10 @@ class API(MixinMeta):
             }
 
         timeout_obj = aiohttp.ClientTimeout(total=120)
-        async with aiohttp.ClientSession(timeout=timeout_obj) as session:
-            async with session.post(predict_endpoint, json=payload, headers=headers) as resp:
-                async with self.bot.session.post(predict_endpoint, json=payload, headers=headers, timeout=timeout) as resp:
+        # Assuming self.session is the cog's session, managed elsewhere
+        async with self.session.post(predict_endpoint, json=payload, headers=headers, timeout=timeout_obj) as resp:
+            # async with session.post(predict_endpoint, json=payload, headers=headers) as resp: # Original line if using local session
+                # async with self.bot.session.post(predict_endpoint, json=payload, headers=headers, timeout=timeout) as resp: # Original line if using local session
                     if resp.status != 200:
                         err_text = await resp.text()
                         log.error(f"Gemini Embedding API Error ({resp.status}) hitting {predict_endpoint}: {err_text}")
@@ -544,7 +545,7 @@ class API(MixinMeta):
         # Headers are defined above based on using_aistudio_key
 
         timeout = aiohttp.ClientTimeout(total=300) 
-        async with self.bot.session.post(generate_endpoint, json=payload, headers=headers, timeout=timeout) as resp:
+        async with self.session.post(generate_endpoint, json=payload, headers=headers, timeout=timeout) as resp:
             if resp.status != 200:
                 err_text = await resp.text()
                 log.error(f"Gemini API Error ({resp.status}) hitting {generate_endpoint}: {err_text}\nPayload: {json.dumps(payload, indent=2)}")
