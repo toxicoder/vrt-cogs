@@ -416,10 +416,10 @@ class API(MixinMeta):
                             _("Gemini Embedding API request failed with status {status}: {error}").format(status=resp.status, error=err_text)
                         )
 
-            response_json = await resp.json()
+                response_json = await resp.json()
 
-            # Validation is now handled by the caller (request_embedding) due to different response structures
-            return response_json
+                # Validation is now handled by the caller (request_embedding) due to different response structures
+                return response_json
 
     async def request_openai_embedding_raw(self, text: str, api_key: str, model: str, base_url: Optional[str] = None ) -> CreateEmbeddingResponse:
         return await request_embedding_raw( 
