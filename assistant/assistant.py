@@ -1,3 +1,4 @@
+import aiohttp
 import asyncio
 import logging
 import os
@@ -74,6 +75,7 @@ class Assistant(
         self.config.register_global(db={})
         self.db: DB = DB()
         self.mp_pool = Pool()
+        self.session: Optional[aiohttp.ClientSession] = None
 
         # {cog_name: {function_name: {"permission_level": "user", "schema": function_json_schema}}}
         self.registry: Dict[str, Dict[str, dict]] = {}
@@ -82,9 +84,12 @@ class Assistant(
         self.first_run = True
 
     async def cog_load(self) -> None:
+        self.session = aiohttp.ClientSession()
         asyncio.create_task(self.init_cog())
 
     async def cog_unload(self):
+        if self.session:
+            asyncio.create_task(self.session.close())
         self.save_loop.cancel()
         self.mp_pool.close()
         self.bot.dispatch("assistant_cog_remove")
