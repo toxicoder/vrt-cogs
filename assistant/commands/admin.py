@@ -523,6 +523,27 @@ class Admin(MixinMeta):
         )
         await ctx.send(embed=adc_help_embed)
 
+    @assistant.command(name="setgaistudiokey")
+    @commands.is_owner()
+    async def set_google_ai_studio_key(self, ctx: commands.Context, key: str):
+        """
+        Set the Google AI Studio API key globally for Gemini models.
+
+        This key is used if you prefer to use Google AI Studio directly
+        instead of Google Cloud Vertex AI for Gemini models.
+        To remove the key, use the value "clear" or "none".
+        """
+        if key.lower() in ["clear", "none"]:
+            if self.db.google_ai_studio_api_key:
+                self.db.google_ai_studio_api_key = None
+                await self.save_conf()
+                await ctx.send(_("Google AI Studio API key has been removed."))
+            else:
+                await ctx.send(_("No Google AI Studio API key was set to remove."))
+        else:
+            self.db.google_ai_studio_api_key = key.strip()
+            await self.save_conf()
+            await ctx.send(_("Google AI Studio API key has been set."))
 
     @assistant.command(name="braveapikey", aliases=["brave"])
     @commands.bot_has_permissions(embed_links=True)

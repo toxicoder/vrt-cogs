@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from multiprocessing.pool import Pool
 from time import perf_counter
 from typing import Callable, Dict, List, Literal, Optional, Union
@@ -101,6 +102,14 @@ class Assistant(
             self.db = await asyncio.to_thread(DB.model_validate, data)
 
         log.info(f"Config loaded in {round((perf_counter() - start) * 1000, 2)}ms")
+
+        # Check for environment variable override for Google AI Studio API Key
+        key = os.getenv("GOOGLE_AI_STUDIO_API_KEY")
+        if key: # Checks for None or empty string implicitly
+            log.info("Found GOOGLE_AI_STUDIO_API_KEY environment variable. This will override any stored key.")
+            self.db.google_ai_studio_api_key = key
+            # This key will be persisted if/when self.save_conf() is called later
+
         await asyncio.to_thread(self._cleanup_db)
 
         # Register internal functions
