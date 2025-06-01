@@ -415,8 +415,10 @@ class API(MixinMeta):
                         raise commands.UserFeedbackCheckFailure(
                             _("Gemini Embedding API request failed with status {status}: {error}").format(status=resp.status, error=err_text)
                         )
+                        
                     response_json = await resp.json()
-            return response_json
+            
+        return response_json
 
     async def request_openai_embedding_raw(self, text: str, api_key: str, model: str, base_url: Optional[str] = None ) -> CreateEmbeddingResponse:
         return await request_embedding_raw( 
