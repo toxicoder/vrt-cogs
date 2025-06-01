@@ -102,6 +102,36 @@ For Gemini models to function correctly, the bot owner must have Google Cloud Pl
 
 Ensure all steps in the "Google Cloud Platform (GCP) Authentication" section have been completed. The "Vertex AI User" role is generally recommended as it provides comprehensive access for Gemini functionalities. Without proper authentication, attempts to use Gemini models will result in errors.
 
+# Channel Context Feature
+
+The Channel Context feature allows the assistant to consider recent messages from the current channel when generating a response. This can help the assistant maintain context over a longer interaction or refer to recent topics discussed in the channel.
+
+- **`channel_context_enabled`**: This is the main setting to turn the feature on or off. When enabled, the bot will fetch recent messages from the channel.
+- **`channel_context_max_messages`**: Defines the maximum number of recent messages (from 0 to 50) that will be included as context. A value of 0 effectively disables the context gathering for that channel, even if the main feature is enabled.
+- **`include_bot_messages_in_context`**: A boolean setting (true/false) that determines whether messages from other bot users should be included in the gathered channel context.
+
+## `[p]channelcontext` Command Group
+
+This group of commands allows administrators to manage the Channel Context feature settings.
+
+### `[p]channelcontext enable <true_false>`
+Enables or disables the Channel Context feature for the server.
+- **`<true_false>`**: Required. Set to `true` to enable or `false` to disable.
+- Aliases: `toggle`
+
+### `[p]channelcontext maxmessages <messages>`
+Sets the maximum number of recent channel messages to include as context.
+- **`<messages>`**: Required. An integer between 0 and 50. Setting to 0 means no messages will be fetched, even if the feature is enabled.
+
+### `[p]channelcontext includebot <true_false>`
+Determines whether messages from other bot users are included in the channel context.
+- **`<true_false>`**: Required. Set to `true` to include messages from other bots, or `false` to exclude them.
+- Aliases: `includebots`
+
+### `[p]channelcontext showsettings`
+Displays the current settings for the Channel Context feature.
+- Aliases: `view`, `settings`
+
 # /draw (Slash Command)
 Generate an image with Dalle-3<br/>
  - Usage: `/draw <prompt> [size] [quality] [style]`

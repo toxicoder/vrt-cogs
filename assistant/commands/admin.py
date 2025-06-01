@@ -97,7 +97,18 @@ class Admin(MixinMeta):
             + _("`Seed:                `{}\n").format(conf.seed)
             + _("`Vision Resolution:   `{}\n").format(conf.vision_detail)
             + _("`Reasoning Effort:    `{}\n").format(conf.reasoning_effort)
-            + _("`System Prompt:       `{} tokens\n").format(humanize_number(system_tokens))
+        )
+        if conf.channel_context_enabled:
+            desc += (
+                _("`Channel Context:     `Enabled\n")
+                + _("  `Max Messages:      `{}\n").format(conf.channel_context_max_messages)
+                + _("  `Include Bot Msgs:  `{}\n").format(conf.include_bot_messages_in_context)
+            )
+        else:
+            desc += _("`Channel Context:     `Disabled\n")
+
+        desc += (
+            _("`System Prompt:       `{} tokens\n").format(humanize_number(system_tokens))
             + _("`User Prompt:         `{} tokens\n").format(humanize_number(prompt_tokens))
             + _("`Endpoint Override:   `{}\n").format(self.db.endpoint_override)
         )
