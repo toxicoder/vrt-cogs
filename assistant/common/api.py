@@ -109,9 +109,20 @@ class API(MixinMeta):
                 # For Gemini with ADC, base_url is regional.
                 base_url_to_use = self.db.endpoint_override or "https://us-central1-aiplatform.googleapis.com/v1"
                 log.debug(f"Using Google Cloud ADC for Gemini chat. Project: {project_id_to_use}, Endpoint: {base_url_to_use}")
-        else:
-            api_key_to_use = conf.api_key
+        else: # OpenAI or compatible API call
+            api_key_to_use = conf.api_key # Ensure we are using the OpenAI key from config
             base_url_to_use = self.db.endpoint_override
+            # It's crucial that api_key_to_use here is the one intended for OpenAI,
+            # not a leftover from a previous Gemini check if the model was switched.
+            if model_name.startswith("gemini-"):
+                # This case should ideally not be hit if logic is correct,
+                # but as a safeguard:
+                log.warning(f"OpenAI path called with Gemini model '{model_name}'. Check logic. Attempting to use conf.api_key.")
+            elif not api_key_to_use and not base_url_to_use:
+                # This is the scenario that would cause the crash.
+                # Log an error or raise a more specific exception if desired,
+                # though the OpenAI client itself will raise an error.
+                log.error(f"OpenAI call for model {model_name} has no API key and no base_url. This will likely fail.")
 
 
         max_convo_tokens = self.get_max_tokens(conf, member) # Max tokens for the *conversation*
