@@ -2076,6 +2076,62 @@ class Admin(MixinMeta):
             await ctx.send(_("Max retention time override for {} added!").format(role.mention))
         await self.save_conf()
 
+    @commands.hybrid_group(name="channelcontext", aliases=["channelctx"])
+    @commands.guild_only()
+    @commands.admin_or_permissions(manage_guild=True)
+    async def channelcontext_commands(self, ctx: commands.Context): # Renamed to avoid conflict if a subcommand is named 'channelcontext'
+        """Configure channel context settings for the assistant."""
+        pass
+
+    @channelcontext_commands.command(name="enable", aliases=["toggle"])
+    async def channelcontext_enable(self, ctx: commands.Context, true_false: bool):
+        """Enable or disable including recent channel messages as context."""
+        guild = ctx.guild
+        conf = self.db.get_conf(guild)
+        conf.channel_context_enabled = true_false
+        await self.save_conf()
+        status = "enabled" if true_false else "disabled"
+        await ctx.send(f"Channel context is now {status}.")
+
+    @channelcontext_commands.command(name="maxmessages")
+    async def channelcontext_maxmessages(self, ctx: commands.Context, messages: int):
+        """Set the maximum number of recent channel messages to include (0-50)."""
+        guild = ctx.guild
+        if not 0 <= messages <= 50:
+            await ctx.send("Please enter a number between 0 and 50.")
+            return
+        conf = self.db.get_conf(guild)
+        conf.channel_context_max_messages = messages
+        await self.save_conf()
+        if messages == 0:
+            await ctx.send(f"Channel context (max messages) is now set to {messages}. The feature will effectively be disabled if it's enabled.")
+        else:
+            await ctx.send(f"Channel context will now include up to {messages} recent messages.")
+
+    @channelcontext_commands.command(name="includebot", aliases=["includebots"])
+    async def channelcontext_includebot(self, ctx: commands.Context, true_false: bool):
+        """Set whether to include messages from other bots in the channel context."""
+        guild = ctx.guild
+        conf = self.db.get_conf(guild)
+        conf.include_bot_messages_in_context = true_false
+        await self.save_conf()
+        status = "will now" if true_false else "will no longer"
+        await ctx.send(f"Messages from other bots {status} be included in channel context.")
+
+    @channelcontext_commands.command(name="showsettings", aliases=["view", "settings"])
+    async def channelcontext_showsettings(self, ctx: commands.Context):
+        """Show the current channel context settings."""
+        guild = ctx.guild
+        conf = self.db.get_conf(guild)
+        enabled_status = "Enabled" if conf.channel_context_enabled else "Disabled"
+        bot_status = "Included" if conf.include_bot_messages_in_context else "Not Included"
+
+        embed = discord.Embed(title="Channel Context Settings", color=await ctx.embed_color())
+        embed.add_field(name="Feature Status", value=enabled_status, inline=True)
+        embed.add_field(name="Max Messages", value=str(conf.channel_context_max_messages), inline=True)
+        embed.add_field(name="Bots' Messages", value=bot_status, inline=True)
+        await ctx.send(embed=embed)
+
     # --------------------------------------------------------------------------------------
     # --------------------------------------------------------------------------------------
     # -------------------------------- OWNER ONLY ------------------------------------------
