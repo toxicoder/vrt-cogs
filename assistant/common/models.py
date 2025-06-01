@@ -95,6 +95,10 @@ class GuildSettings(AssistantBaseModel):
     collab_convos: bool = False
     reasoning_effort: str = "low"  # low, medium, high
 
+    channel_context_enabled: bool = False
+    channel_context_max_messages: int = 10
+    include_bot_messages_in_context: bool = False
+
     # Auto-answer
     auto_answer: bool = False  # Answer questions anywhere if one is detected and embedding is found for it
     auto_answer_threshold: float = 0.7  # 0.0 - 1.0  # Confidence threshold for auto-answer
@@ -231,6 +235,7 @@ class Conversation(AssistantBaseModel):
     messages: t.List[dict] = []
     last_updated: float = 0.0
     system_prompt_override: t.Optional[str] = None
+    included_channel_message_ids: t.Set[int] = Field(default_factory=set)
 
     def function_count(self) -> int:
         if not self.messages:
@@ -249,12 +254,14 @@ class Conversation(AssistantBaseModel):
         ]
         if any(clear):
             self.messages.clear()
+            self.included_channel_message_ids.clear()
         elif conf.max_retention:
             self.messages = self.messages[-conf.get_user_max_retention(member) :]
 
     def reset(self):
         self.refresh()
         self.messages.clear()
+        self.included_channel_message_ids.clear()
 
     def refresh(self):
         self.last_updated = datetime.now().timestamp()
@@ -290,8 +297,11 @@ class Conversation(AssistantBaseModel):
             self.messages.append(message)
         self.refresh()
 
-    def prepare_chat(
+    async def prepare_chat(
         self,
+        conf: GuildSettings,
+        channel: discord.TextChannel,
+        current_message_id: int,
         user_message: str,
         initial_prompt: str,
         system_prompt: str,
@@ -305,6 +315,24 @@ class Conversation(AssistantBaseModel):
             prepared.append({"role": "developer", "content": system_prompt})
         if initial_prompt.strip():
             prepared.append({"role": "user", "content": initial_prompt})
+
+        if conf.channel_context_enabled:
+            channel_context_formatted_messages = []
+            history_iterator = channel.history(limit=conf.channel_context_max_messages, oldest_first=True)
+            async for hist_msg in history_iterator:
+                if hist_msg.id == current_message_id:
+                    continue
+                if not conf.include_bot_messages_in_context and hist_msg.author.bot:
+                    continue
+                if hist_msg.id in self.included_channel_message_ids:
+                    continue
+                msg_role = "assistant" if hist_msg.author.bot else "user"
+                msg_content = f"{hist_msg.author.display_name}: {hist_msg.content}"
+                formatted_hist_msg = {"role": msg_role, "content": msg_content}
+                channel_context_formatted_messages.append(formatted_hist_msg)
+                self.included_channel_message_ids.add(hist_msg.id)
+            prepared.extend(channel_context_formatted_messages)
+
         prepared.extend(self.messages)
 
         if images:

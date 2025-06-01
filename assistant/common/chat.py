@@ -367,6 +367,7 @@ class ChatHandler(MixinMeta):
             "currency": await bank.get_currency_name(guild),
             "bank": await bank.get_bank_name(guild),
             "balance": bal,
+            "message_obj": message_obj,
         }
 
         # Don't include if user is not a tutor
@@ -769,11 +770,35 @@ class ChatHandler(MixinMeta):
                     system_prompt += f"\n\n# RELATED EMBEDDINGS\n{''.join(embeds[1:])}"
 
         images = images if model in SUPPORTS_VISION else []
-        messages = conversation.prepare_chat(
-            message,
-            initial_prompt.strip(),
-            system_prompt.strip(),
-            name=clean_name(author.name) if author else None,
+        current_message_id = extras.get("message_id", 0) if not hasattr(channel, "last_message_id") else channel.last_message_id
+        if hasattr(author, "id"): # author can be discord.Member or int (ID)
+            user_id = author.id
+        else: # author is an int
+            user_id = author
+
+        # message_obj is passed as extras["message_obj"] from _get_chat_response -> handle_message
+        # however, prepare_messages is also called by other methods that may not pass message_obj
+        # We need current_message_id for channel history fetching.
+        # If we are in a channel context, message.id would be from the original discord.Message
+        # Let's try to get it from extras if available, otherwise use channel's last message id
+        # as a fallback, or 0 if no better option.
+        current_message_obj = extras.get("message_obj")
+        if current_message_obj:
+            current_message_id = current_message_obj.id
+        elif channel and hasattr(channel, 'last_message_id'):
+            current_message_id = channel.last_message_id
+        else:
+            current_message_id = 0
+
+
+        messages = await conversation.prepare_chat(
+            conf=conf,
+            channel=channel,
+            current_message_id=current_message_id,
+            user_message=message,
+            initial_prompt=initial_prompt.strip(),
+            system_prompt=system_prompt.strip(),
+            name=clean_name(author.name) if (author and hasattr(author, "name")) else None,
             images=images,
             resolution=conf.vision_detail,
         )
