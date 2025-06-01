@@ -415,8 +415,7 @@ class API(MixinMeta):
                         raise commands.UserFeedbackCheckFailure(
                             _("Gemini Embedding API request failed with status {status}: {error}").format(status=resp.status, error=err_text)
                         )
-
-                response_json = await resp.json()
+                    response_json = await resp.json()
 
                 # Validation is now handled by the caller (request_embedding) due to different response structures
                 return response_json
