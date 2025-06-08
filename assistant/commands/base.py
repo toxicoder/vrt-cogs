@@ -310,8 +310,8 @@ If a file has no extension it will still try to read it only if it can be decode
         if not delta:
             txt = _("Invalid timeframe! Please use a valid time format like `1h` for an hour")
             return await interaction.response.send_message(txt, ephemeral=True)
-        if delta > timedelta(hours=48):
-            txt = _("The maximum timeframe is 48 hours!")
+        if delta > timedelta(days=30):
+            txt = _("The maximum timeframe is 30 days!")
             return await interaction.response.send_message(txt, ephemeral=True)
         perms = [
             await self.bot.is_mod(interaction.user),
@@ -357,8 +357,6 @@ If a file has no extension it will still try to read it only if it can be decode
 
         if not messages:
             return await interaction.followup.send(_("No messages found to summarize within that timeframe!"))
-        if len(messages) < 5:
-            return await interaction.followup.send(_("Not enough messages found to summarize within that timeframe!"))
 
         conf = self.db.get_conf(interaction.guild)
 
