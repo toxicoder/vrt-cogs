@@ -2,6 +2,8 @@ import logging
 import typing as t
 from datetime import datetime, timezone
 
+from assistant.common.constants import DEFAULT_GEMINI_EMBED_MODEL
+
 import discord
 import numpy as np
 import orjson
@@ -379,7 +381,11 @@ class DB(AssistantBaseModel):
 
     def get_conf(self, guild: t.Union[discord.Guild, int]) -> GuildSettings:
         gid = guild if isinstance(guild, int) else guild.id
-        return self.configs.setdefault(gid, GuildSettings())
+        guild_settings = self.configs.setdefault(gid, GuildSettings())
+        if self.gemini_api_key or self.google_ai_studio_api_key:
+            if guild_settings.embed_model == "text-embedding-3-small":
+                guild_settings.embed_model = DEFAULT_GEMINI_EMBED_MODEL
+        return guild_settings
 
     def get_conversation(
         self,

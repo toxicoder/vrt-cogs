@@ -117,6 +117,9 @@ IMAGE_COSTS = {
     "hd1792x1024": 0.12,
     "hd1024x1792": 0.12,
 }
+
+DEFAULT_GEMINI_EMBED_MODEL = "models/embedding-001"
+
 SUPPORTS_SEED = [
     "gpt-3.5-turbo",
     "gpt-3.5-turbo-1106",
