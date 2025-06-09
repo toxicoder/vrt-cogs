@@ -351,6 +351,13 @@ class API(MixinMeta):
             )
             return embedding_values
         else: # OpenAI or compatible
+            if not conf.api_key:
+                raise commands.UserFeedbackCheckFailure(
+                    _(
+                        "API key is missing. The selected embedding model '{model_name}' requires an OpenAI or compatible API key. "
+                        "Please set one or choose a Gemini embedding model."
+                    ).format(model_name=model_name)
+                )
             api_key_to_use = conf.api_key # Standard OpenAI key
             response: CreateEmbeddingResponse = await self.request_openai_embedding_raw(
                 text=text,
