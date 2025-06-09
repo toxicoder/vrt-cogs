@@ -37,6 +37,29 @@ from ..views import CodeMenu, EmbeddingMenu, SetAPI
 log = logging.getLogger("red.vrt.assistant.admin")
 _ = Translator("Assistant", __file__)
 
+# Constants for Gemini Settings
+GEMINI_SAFETY_CATEGORIES = [
+    "HARM_CATEGORY_HARASSMENT",
+    "HARM_CATEGORY_HATE_SPEECH",
+    "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+    "HARM_CATEGORY_DANGEROUS_CONTENT",
+]
+GEMINI_SAFETY_THRESHOLDS = [
+    "BLOCK_NONE",
+    "BLOCK_ONLY_HIGH",
+    "BLOCK_LOW_AND_ABOVE",
+    "BLOCK_MEDIUM_AND_ABOVE",
+    "HARM_BLOCK_THRESHOLD_UNSPECIFIED",
+]
+GEMINI_GEN_CONFIG_PARAMS = [
+    "topP",
+    "topK",
+    "candidateCount",
+    "maxOutputTokens",
+    "temperature",
+    "stopSequences",
+]
+
 
 @cog_i18n(_)
 class Admin(MixinMeta):
@@ -50,6 +73,118 @@ class Admin(MixinMeta):
         You will need an **[api key](https://platform.openai.com/account/api-keys)** from OpenAI to use ChatGPT and their other models.
         """
         pass
+
+    @assistant.group(name="geminisettings", aliases=["gemset", "gs"])
+    async def gemini_settings(self, ctx: commands.Context):
+        """Configure Gemini-specific model settings."""
+        pass
+
+    @gemini_settings.command(name="googlesearch")
+    async def toggle_gemini_search(self, ctx: commands.Context):
+        """Toggle Google Search grounding for Gemini models."""
+        conf = self.db.get_conf(ctx.guild)
+        conf.gemini_enable_google_search = not conf.gemini_enable_google_search
+        await self.save_conf()
+        await ctx.send(
+            _("Gemini Google Search is now {}.").format(
+                _("enabled") if conf.gemini_enable_google_search else _("disabled")
+            )
+        )
+
+    @gemini_settings.command(name="thinking")
+    async def toggle_gemini_thinking(self, ctx: commands.Context):
+        """Toggle the 'thinking' prompt for Gemini models."""
+        conf = self.db.get_conf(ctx.guild)
+        conf.gemini_enable_thinking = not conf.gemini_enable_thinking
+        await self.save_conf()
+        await ctx.send(
+            _("Gemini 'thinking' prompt is now {}.").format(
+                _("enabled") if conf.gemini_enable_thinking else _("disabled")
+            )
+        )
+
+    @gemini_settings.command(name="setsafety")
+    @app_commands.describe(
+        category="The harm category to configure.",
+        threshold="The block threshold for this category.",
+    )
+    @app_commands.choices(
+        category=[Choice(name=i, value=i) for i in GEMINI_SAFETY_CATEGORIES],
+        threshold=[Choice(name=i, value=i) for i in GEMINI_SAFETY_THRESHOLDS],
+    )
+    async def set_gemini_safety(self, ctx: commands.Context, category: str, threshold: str):
+        """Set a specific Gemini safety setting."""
+        conf = self.db.get_conf(ctx.guild)
+
+        upper_category = category.upper()
+        upper_threshold = threshold.upper()
+
+        if upper_category not in GEMINI_SAFETY_CATEGORIES:
+            await ctx.send(_("Invalid category: `{}`. Please choose from the allowed list.").format(category))
+            return
+        if upper_threshold not in GEMINI_SAFETY_THRESHOLDS:
+            await ctx.send(_("Invalid threshold: `{}`. Please choose from the allowed list.").format(threshold))
+            return
+
+        conf.gemini_safety_settings[upper_category] = upper_threshold
+        await self.save_conf()
+        await ctx.send(
+            _("Gemini safety setting for `{}` updated to `{}`.").format(upper_category, upper_threshold)
+        )
+
+    @gemini_settings.command(name="setgenconfig")
+    @app_commands.describe(
+        parameter="The generation parameter to configure.",
+        value="The value for the parameter.",
+    )
+    @app_commands.choices(
+        parameter=[Choice(name=i, value=i) for i in GEMINI_GEN_CONFIG_PARAMS]
+    )
+    async def set_gemini_gen_config(self, ctx: commands.Context, parameter: str, value: str):
+        """Set a specific Gemini generation configuration parameter."""
+        conf = self.db.get_conf(ctx.guild)
+
+        converted_value: t.Any = None
+        try:
+            if parameter == "topP":
+                converted_value = float(value)
+                if not (0.0 <= converted_value <= 1.0):
+                    raise ValueError("topP must be between 0.0 and 1.0.")
+            elif parameter == "topK":
+                converted_value = int(value)
+                if converted_value < 0:
+                    raise ValueError("topK must be a positive integer.")
+            elif parameter == "candidateCount":
+                converted_value = int(value)
+                if converted_value <= 0:
+                    raise ValueError("candidateCount must be a positive integer.")
+            elif parameter == "maxOutputTokens":
+                converted_value = int(value)
+                if converted_value <= 0:
+                    raise ValueError("maxOutputTokens must be a positive integer.")
+            elif parameter == "temperature":
+                converted_value = float(value)
+                # Gemini's range can be 0.0 to 2.0 for some models, or 0.0 to 1.0 for others.
+                # For now, let's allow up to 2.0 as per general OpenAI standards unless a specific Gemini limit is hit.
+                if not (0.0 <= converted_value <= 2.0):
+                     raise ValueError("temperature must be between 0.0 and 2.0.")
+            elif parameter == "stopSequences":
+                if value.strip():
+                    converted_value = [seq.strip() for seq in value.split(",")]
+                else: # Allow clearing stopSequences
+                    converted_value = []
+            else:
+                await ctx.send(_("Unknown parameter: `{}`").format(parameter))
+                return
+        except ValueError as e:
+            await ctx.send(_("Invalid value for parameter `{}`: {}. {}").format(parameter, value, e))
+            return
+
+        conf.gemini_generation_config[parameter] = converted_value
+        await self.save_conf()
+        await ctx.send(
+            _("Gemini generation config `{}` set to `{}`.").format(parameter, converted_value)
+        )
 
     @assistant.command(name="view", aliases=["v"])
     @commands.bot_has_permissions(embed_links=True)
@@ -97,6 +232,12 @@ class Admin(MixinMeta):
             + _("`Seed:                `{}\n").format(conf.seed)
             + _("`Vision Resolution:   `{}\n").format(conf.vision_detail)
             + _("`Reasoning Effort:    `{}\n").format(conf.reasoning_effort)
+            + _("`Gemini Google Search:  `{}\n").format(
+                _("Enabled") if conf.gemini_enable_google_search else _("Disabled")
+            )
+            + _("`Gemini Thinking Prompt:`{}\n").format(
+                _("Enabled") if conf.gemini_enable_thinking else _("Disabled")
+            )
         )
         if conf.channel_context_enabled:
             desc += (
@@ -302,6 +443,14 @@ class Admin(MixinMeta):
                     "Get your API key **[Here](https://brave.com/search/api/)**\n"
                 )
             embed.add_field(name=_("Brave Websearch API key"), value=value)
+
+        if conf.gemini_safety_settings:
+            safety_display = "\n".join([f"  {k}: {v}" for k, v in conf.gemini_safety_settings.items()])
+            embed.add_field(name=_("Gemini Safety Settings"), value=box(safety_display), inline=False)
+
+        if conf.gemini_generation_config:
+            gen_config_display = "\n".join([f"  {k}: {v}" for k, v in conf.gemini_generation_config.items()])
+            embed.add_field(name=_("Gemini Generation Config"), value=box(gen_config_display), inline=False)
 
         embed.set_footer(text=_("Showing settings for {}").format(ctx.guild.name))
 
