@@ -1,3 +1,6 @@
+# For Gemini models (those starting with "gemini-"), the system will attempt to use any specified model string.
+# This list provides known Gemini model names and their typical token limits, but it is not exhaustive.
+# If a Gemini model is used that is not on this list, a default large token limit will apply.
 MODELS = {
     "gpt-3.5-turbo": 4096,
     "gpt-3.5-turbo-1106": 16385,
