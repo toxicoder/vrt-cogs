@@ -925,8 +925,10 @@ class Admin(MixinMeta):
     async def set_autoanswer_model(self, ctx: commands.Context, model: str):
         """Set the model used for auto-answer"""
         conf = self.db.get_conf(ctx.guild)
-        if model not in MODELS:
-            return await ctx.send(_("Invalid model, valid models are: {}").format(humanize_list(MODELS)))
+        if not model.startswith("gemini-") and model not in MODELS:
+            valid_models_text = humanize_list(list(MODELS.keys()))
+            gemini_info = _("\n(Gemini models starting with 'gemini-' can also be used directly, e.g., 'gemini-1.5-pro-latest')")
+            return await ctx.send(_("Invalid model. Known models are: {}\n{}").format(box(valid_models_text), gemini_info))
         conf.auto_answer_model = model
         await ctx.send(_("Auto-answer model has been set to **{}**").format(model))
         await self.save_conf()
@@ -1246,17 +1248,27 @@ class Admin(MixinMeta):
 
         if not model:
             valid = [i for i in MODELS]
+            gemini_info = _("\n(Gemini models starting with 'gemini-' can also be used directly)")
             humanized = humanize_list(valid)
             formatted = box(humanized)
-            return await ctx.send(_("Valid models are:\n{}").format(formatted))
+            return await ctx.send(_("Valid models from the known list are:\n{}{}\nOr provide any Gemini model string.").format(formatted, gemini_info))
 
-        if conf.api_key and "deepseek" not in model and not self.db.endpoint_override:
+        if not model.startswith("gemini-") and conf.api_key and "deepseek" not in model and not self.db.endpoint_override:
             try:
                 client = openai.AsyncOpenAI(api_key=conf.api_key)
                 await client.models.retrieve(model)
             except openai.NotFoundError as e:
-                txt = _("Error: {}").format(e.response.json()["error"]["message"])
+                # Check if it's a non-Gemini model that failed validation
+                txt = _("Model '{model_name}' not found or not accessible with your current API key. ").format(model_name=model)
+                txt += _("Please ensure it's a valid model name and your API key has permissions for it. ")
+                txt += _("For Gemini models, ensure the name is correct (e.g., 'gemini-1.5-pro-latest').")
+                # txt = _("Error: {}").format(e.response.json()["error"]["message"]) # Old error
                 return await ctx.send(txt)
+            except Exception as e: # Catch other potential errors during client interaction
+                log.error(f"Error validating model {model} with OpenAI client", exc_info=e)
+                txt = _("An error occurred while trying to validate the model '{model_name}'. Please check the logs.").format(model_name=model)
+                return await ctx.send(txt)
+
 
         conf.model = model
         await ctx.send(_("The **{}** model will now be used").format(model))
@@ -1971,14 +1983,23 @@ class Admin(MixinMeta):
             return
 
         if not model:
-            return await ctx.send(_("Valid models are:\n{}").format(box(humanize_list(list(MODELS.keys)))))
+            valid_models_text = humanize_list(list(MODELS.keys()))
+            gemini_info = _("\n(Gemini models starting with 'gemini-' can also be used directly, e.g., 'gemini-1.5-pro-latest')")
+            return await ctx.send(_("Valid models from the known list are:\n{}{}\nOr provide any Gemini model string.").format(box(valid_models_text), gemini_info))
 
-        if conf.api_key:
+        if not model.startswith("gemini-") and conf.api_key and "deepseek" not in model and not self.db.endpoint_override: # Added deepseek check from base model command
             try:
                 client = openai.AsyncOpenAI(api_key=conf.api_key)
                 await client.models.retrieve(model)
             except openai.NotFoundError as e:
-                txt = _("Error: {}").format(e.response.json()["error"]["message"])
+                txt = _("Model '{model_name}' not found or not accessible with your current API key for role override. ").format(model_name=model)
+                txt += _("Please ensure it's a valid model name and your API key has permissions for it. ")
+                txt += _("For Gemini models, ensure the name is correct (e.g., 'gemini-1.5-pro-latest').")
+                # txt = _("Error: {}").format(e.response.json()["error"]["message"]) # Old error
+                return await ctx.send(txt)
+            except Exception as e: # Catch other potential errors
+                log.error(f"Error validating model {model} for role override with OpenAI client", exc_info=e)
+                txt = _("An error occurred while trying to validate the model '{model_name}' for role override. Please check the logs.").format(model_name=model)
                 return await ctx.send(txt)
 
         if role.id in conf.role_overrides:

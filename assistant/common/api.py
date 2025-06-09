@@ -153,7 +153,7 @@ class API(MixinMeta):
             available_for_response = max_model_tokens - current_convo_tokens
             max_api_response_tokens = max(0, available_for_response) if not is_gemini else None # Gemini often doesn't need this if not strictly limiting output
 
-        if model_name not in MODELS: # Check against our known models list
+        if not is_gemini and model_name not in MODELS: # Check against our known models list for non-Gemini
             log.warning(f"Model {model_name} is not in internal MODELS list. Attempting to use, but may fail.")
             # Potentially switch to a default if truly unknown, but for now, let it try
 
