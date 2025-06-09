@@ -1,0 +1,28 @@
+{
+  "author": ["Jules (AI Assistant)", "YourName/GitHub"],
+  "description": "Creates YouTube Music playlists using natural language prompts via Gemini and YouTube Data API.",
+  "disabled": false,
+  "end_user_data_statement": "This cog stores API keys for Gemini and YouTube (OAuth credentials) if configured. User prompts and generated playlist data are processed but not stored persistently by the cog itself beyond operational necessity. Playlist data is stored on YouTube.",
+  "hidden": false,
+  "install_msg": "Thanks for installing the YouTube Playlist Assistant! Please ensure you have configured your .env file in the bot's root directory with: GEMINI_API_KEY, YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN. The bot's YouTube account will be used to create public playlists.",
+  "min_bot_version": "3.5.0",
+  "min_python_version": [3, 10, 0],
+  "permissions": ["send_messages", "embed_links"],
+  "required_cogs": {},
+  "requirements": [
+    "python-dotenv",
+    "google-generativeai",
+    "google-api-python-client",
+    "google-auth-oauthlib"
+  ],
+  "short": "AI YouTube Playlist Creator",
+  "tags": [
+    "youtube",
+    "music",
+    "playlist",
+    "ai",
+    "gemini",
+    "assistant"
+  ],
+  "type": "COG"
+}
