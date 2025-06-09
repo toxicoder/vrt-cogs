@@ -95,6 +95,10 @@ class GuildSettings(AssistantBaseModel):
     model: str = "gpt-4o-mini"
     embed_model: str = "text-embedding-3-small"  # Or text-embedding-3-large, text-embedding-ada-002
     collab_convos: bool = False
+    gemini_safety_settings: t.Dict[str, str] = Field(default_factory=dict)
+    gemini_generation_config: t.Dict[str, t.Any] = Field(default_factory=dict)
+    gemini_enable_google_search: bool = False
+    gemini_enable_thinking: bool = False
     reasoning_effort: str = "low"  # low, medium, high
 
     channel_context_enabled: bool = False

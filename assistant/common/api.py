@@ -180,6 +180,7 @@ class API(MixinMeta):
                 base_url=base_url_to_use,
                 system_message=system_message_str,
                 using_aistudio_key=using_aistudio_key,
+                conf=conf,
                 # seed=conf.seed, # TODO: Add seed if supported
             )
             
@@ -458,6 +459,7 @@ class API(MixinMeta):
         base_url: str,
         system_message: Optional[str] = None,
         using_aistudio_key: bool = False,
+        conf: Optional[GuildSettings] = None, # Added conf
     ) -> dict: 
         """
         Makes a raw request to a Google Gemini Chat Completion model (Vertex AI or AI Studio).
@@ -523,45 +525,75 @@ class API(MixinMeta):
             elif isinstance(msg.get("content"), str): 
                  gemini_contents.append({"role": role, "parts": [{"text": msg["content"]}]})
 
+        # Handle "thinking" prompt from conf
+        thinking_prefix = "Please think step by step before answering. "
+        if conf and conf.gemini_enable_thinking:
+            if system_message:
+                system_message = thinking_prefix + system_message
+            elif gemini_contents:
+                # Try to prepend to the first user message's text part
+                # Or insert a new user message at the beginning
+                inserted_thinking_prompt = False
+                if gemini_contents[0]["role"] == "user" and gemini_contents[0]["parts"] and isinstance(gemini_contents[0]["parts"][0].get("text"), str):
+                    gemini_contents[0]["parts"][0]["text"] = thinking_prefix + gemini_contents[0]["parts"][0]["text"]
+                    inserted_thinking_prompt = True
+                if not inserted_thinking_prompt: # Fallback: insert a new user message
+                    gemini_contents.insert(0, {"role": "user", "parts": [{"text": thinking_prefix.strip()}]})
+
+
         payload = {"contents": gemini_contents}
         
+        # Initialize generation_config with defaults from parameters
         generation_config = {}
         if temperature is not None:
             generation_config["temperature"] = temperature
         if max_tokens is not None: 
             generation_config["maxOutputTokens"] = max_tokens
 
+        # Override with or add settings from conf.gemini_generation_config
+        if conf and conf.gemini_generation_config:
+            generation_config.update(conf.gemini_generation_config)
+
         if generation_config:
             payload["generationConfig"] = generation_config
 
-        if system_message:
-            payload["systemInstruction"] = {"parts": [{"text": system_message}]} # AI Studio format for system prompt
+        # Safety Settings from conf
+        if conf and conf.gemini_safety_settings:
+            formatted_safety_settings = []
+            for category, threshold in conf.gemini_safety_settings.items():
+                formatted_safety_settings.append({"category": category, "threshold": threshold})
+            if formatted_safety_settings:
+                payload["safetySettings"] = formatted_safety_settings
 
+        if system_message:
+            payload["systemInstruction"] = {"parts": [{"text": system_message}]}
+
+        gemini_tools = [] # Initialize gemini_tools list here
         if functions: 
-            gemini_tools = []
             function_declarations = []
             for func_schema in functions:
                 # Ensure parameters is a dict, even if empty, for Gemini schema
                 params = func_schema.get("parameters")
                 if params is None or not isinstance(params, dict) or not params.get("properties"):
-                     # Gemini needs parameters to be a valid OpenAPI schema object.
-                     # If it's missing or not structured correctly, provide a default empty one.
                     params = {"type": "object", "properties": {}}
-
                 function_declarations.append({
                     "name": func_schema["name"],
                     "description": func_schema.get("description", ""),
                     "parameters": params,
                 })
-
             if function_declarations:
-                 gemini_tools.append({"functionDeclarations": function_declarations})
-            if gemini_tools:
-                payload["tools"] = gemini_tools
+                gemini_tools.append({"functionDeclarations": function_declarations})
+
+        # Google Search tool from conf
+        if conf and conf.gemini_enable_google_search:
+            gemini_tools.append({"googleSearchRetrieval": {"disableAttribution": False}})
+
+        if gemini_tools:
+            payload["tools"] = gemini_tools
         
         # Headers are defined above based on using_aistudio_key
 
-        timeout = aiohttp.ClientTimeout(total=300) 
+        timeout = aiohttp.ClientTimeout(total=300)
         async with self.session.post(generate_endpoint, json=payload, headers=headers, timeout=timeout) as resp:
             if resp.status != 200:
                 err_text = await resp.text()
